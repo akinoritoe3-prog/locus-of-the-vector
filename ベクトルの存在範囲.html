@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>点Pの存在範囲シミュレーター（不具合修正＆図示拡充版）</title>
+<style>
+  body {
+    font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+    background-color: #f0f2f5;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100vh;
+    box-sizing: border-box;
+  }
+  .main-title {
+    font-size: 1.8rem;
+    color: #2c3e50;
+    margin: 0 0 20px 0;
+    border-bottom: 3px solid #3498db;
+    padding-bottom: 5px;
+  }
+  .layout-container {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    width: 100%;
+    max-width: 1150px;
+    align-items: flex-start;
+  }
+  .side-panel {
+    flex: 0 0 360px;
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .canvas-panel {
+    flex: 1;
+    background: #fff;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .controls-title {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #34495e;
+    border-left: 5px solid #3498db;
+    padding-left: 10px;
+    margin-bottom: 5px;
+  }
+  .formula-box {
+    font-size: 1.6rem;
+    font-style: italic;
+    font-family: "Times New Roman", Times, serif;
+    font-weight: bold;
+    text-align: center;
+    padding: 10px;
+    background: #eef7ff;
+    border-radius: 8px;
+  }
+  .vec {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    vertical-align: bottom;
+    line-height: 1;
+    margin: 0 2px;
+  }
+  .vec::before {
+    content: '→';
+    font-size: 0.6em;
+    margin-bottom: -0.2em;
+  }
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .control-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 15px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+  }
+  .label-text {
+    font-weight: bold;
+    font-size: 0.95rem;
+    color: #555;
+    white-space: nowrap;
+    margin-right: 10px;
+  }
+  .input-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  select, input {
+    font-size: 1rem;
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: white;
+  }
+  input[type="number"] {
+    width: 65px;
+  }
+  canvas {
+    max-width: 100%;
+    height: auto;
+  }
+</style>
+</head>
+<body>
+
+<h1 class="main-title">点Pの存在範囲</h1>
+
+<div class="layout-container">
+  <div class="side-panel">
+    <div class="formula-box">
+      <span class="vec">OP</span> = s <span class="vec">a</span> + t <span class="vec">b</span>
+    </div>
+    
+    <div class="controls-title">sとtの条件設定</div>
+    
+    <div class="control-group">
+      <div class="control-item">
+        <span class="label-text">条件1</span>
+        <div class="input-row">
+          s + t
+          <select id="condST_op">
+            <option value="=" selected>=</option>
+            <option value=">=">≧</option>
+            <option value="<=">≦</option>
+            <option value="none">条件なし</option>
+          </select>
+          <input type="number" id="condST_val" value="1" step="0.1">
+        </div>
+      </div>
+
+      <div class="control-item">
+        <span class="label-text">条件2</span>
+        <div class="input-row">
+          s
+          <select id="condS_op">
+            <option value=">=" selected>≧</option>
+            <option value="<=">≦</option>
+            <option value="none">条件なし</option>
+          </select>
+          0
+        </div>
+      </div>
+
+      <div class="control-item">
+        <span class="label-text">条件3</span>
+        <div class="input-row">
+          t
+          <select id="condT_op">
+            <option value=">=" selected>≧</option>
+            <option value="<=">≦</option>
+            <option value="none">条件なし</option>
+          </select>
+          0
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="canvas-panel">
+    <canvas id="canvas" width="700" height="600"></canvas>
+  </div>
+</div>
+
+<script>
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+
+  const O = { x: 350, y: 280 }; 
+  const scale = 0.8; 
+  const base_ax = -100 * scale;
+  const base_ay = -120 * scale;
+  const base_bx = 100 * scale;
+  const base_by = -120 * scale;
+
+  const A = { x: O.x + base_ax, y: O.y + base_ay };
+  const B = { x: O.x + base_bx, y: O.y + base_by };
+
+  const ax = A.x - O.x;
+  const ay = A.y - O.y;
+  const bx = B.x - O.x;
+  const by = B.y - O.y;
+  const D = ax * by - ay * bx; 
+
+  const ids = ['condST_op', 'condST_val', 'condS_op', 'condT_op'];
+  ids.forEach(id => document.getElementById(id).addEventListener('input', draw));
+
+  function drawArrow(ctx, fromX, fromY, toX, toY, color="black", width=2) {
+    const headlen = 10;
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const angle = Math.atan2(dy, dx);
+    ctx.beginPath();
+    ctx.lineWidth = width;
+    ctx.strokeStyle = color;
+    ctx.moveTo(fromX, fromY);
+    ctx.lineTo(toX, toY);
+    ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
+    ctx.stroke();
+  }
+
+  function drawVectorLabel(ctx, prefix, vecChar, x, y, color="black") {
+    ctx.font = "italic 20px 'Times New Roman', serif";
+    ctx.fillStyle = color;
+    let curX = x;
+    if (prefix) {
+      ctx.fillText(prefix, curX, y);
+      curX += ctx.measureText(prefix).width + 2;
+    }
+    ctx.fillText(vecChar, curX, y);
+    const charW = ctx.measureText(vecChar).width;
+    const arrowY = y - 16;
+    ctx.beginPath();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = color;
+    ctx.moveTo(curX, arrowY);
+    ctx.lineTo(curX + charW, arrowY);
+    ctx.lineTo(curX + charW - 4, arrowY - 3);
+    ctx.moveTo(curX + charW, arrowY);
+    ctx.lineTo(curX + charW - 4, arrowY + 3);
+    ctx.stroke();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, width, height);
+
+    const stOp = document.getElementById('condST_op').value;
+    const stVal = parseFloat(document.getElementById('condST_val').value) || 0;
+    const sOp = document.getElementById('condS_op').value;
+    const tOp = document.getElementById('condT_op').value;
+
+    const imgData = ctx.createImageData(width, height);
+    const data = imgData.data;
+
+    // 【修正：s+t=kの判定ロジックを変更】
+    // ピクセル単位での塗りつぶしは領域（≦、≧）のみ行い、境界線（＝）はパス描画で行います。
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const dx = x - O.x, dy = y - O.y;
+        const s = (dx * by - dy * bx) / D;
+        const t = (ax * dy - ay * dx) / D;
+        
+        let match = true;
+        // s+t=k の場合はピクセル単位の塗りつぶしを行わない（後で滑らかに描画）
+        if (stOp === '=') {
+            match = false; 
+        } else if (stOp === '>=') { 
+            if (s + t < stVal) match = false; 
+        } else if (stOp === '<=') { 
+            if (s + t > stVal) match = false; 
+        }
+
+        // s, t の条件判定（共通）
+        if (match && sOp === '>=') { if (s < 0) match = false; }
+        else if (match && sOp === '<=') { if (s > 0) match = false; }
+
+        if (match && tOp === '>=') { if (t < 0) match = false; }
+        else if (match && tOp === '<=') { if (t > 0) match = false; }
+
+        // 領域（≦, ≧）を半透明赤で塗りつぶす
+        if (match) {
+          const i = (y * width + x) * 4;
+          data[i] = 255; data[i+1] = 0; data[i+2] = 0; // 赤色
+          data[i+3] = 100; // 半透明
+        }
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+
+    // 【修正：境界線（s+t=k）を滑らかにパス描画】
+    // 不具合修正：直線上で他の2つの条件を満たす線分だけを計算して描画する
+    if (stOp !== 'none') {
+        const k = stVal;
+        // 直線の方程式：t = k - s
+        
+        // 直線上で他の2つの条件を満たすsの範囲を決定する
+        let s_min = -Infinity;
+        let s_max = Infinity;
+
+        // sの条件判定
+        if (sOp !== 'none') {
+            const s_bound = 0; // 条件は0固定
+            if (sOp === '>=') {
+                s_min = Math.max(s_min, s_bound);
+            } else if (sOp === '<=') {
+                s_max = Math.min(s_max, s_bound);
+            }
+        }
+
+        // tの条件判定 (t = k - s を代入してsの条件にする)
+        if (tOp !== 'none') {
+            const t_bound = 0; // 条件は0固定
+            if (tOp === '>=') {
+                // k - s >= t_bound  -> s <= k - t_bound
+                s_max = Math.min(s_max, k - t_bound);
+            } else if (tOp === '<=') {
+                // k - s <= t_bound  -> s >= k - t_bound
+                s_min = Math.max(s_min, k - t_bound);
+            }
+        }
+
+        // sの有効な範囲が存在する場合のみ描画
+        if (s_min <= s_max) {
+            // 十分に大きい値に設定
+            const large_val = 10; 
+            if (s_min === -Infinity) s_min = -large_val;
+            if (s_max === Infinity) s_max = large_val;
+
+            // sの端点をピクセル座標に変換
+            // p1(s_min, k-s_min)
+            const p1_pix = { x: O.x + ax * s_min + bx * (k - s_min), y: O.y + ay * s_min + by * (k - s_min) };
+            // p2(s_max, k-s_max)
+            const p2_pix = { x: O.x + ax * s_max + bx * (k - s_max), y: O.y + ay * s_max + by * (k - s_max) };
+
+            ctx.beginPath();
+            ctx.moveTo(p1_pix.x, p1_pix.y);
+            ctx.lineTo(p2_pix.x, p2_pix.y);
+            
+            ctx.lineWidth = (stOp === '=') ? 3 : 2; // =のときは太く
+            ctx.strokeStyle = (stOp === '=') ? "rgba(255, 0, 0, 1)" : "rgba(255, 0, 0, 0.5)"; // =のときは濃い赤
+            ctx.stroke();
+        }
+    }
+
+    // 軸や補助線の描画
+    ctx.fillStyle = "#888";
+    ctx.font = "bold 18px sans-serif";
+    ctx.fillText("O", O.x - 12, O.y + 20);
+    ctx.fillText("A", A.x - 20, A.y - 8);
+    ctx.fillText("B", B.x + 10, B.y - 8);
+
+    // 基準ベクトル a, b
+    drawArrow(ctx, O.x, O.y, A.x, A.y, "#333", 2.5);
+    drawArrow(ctx, O.x, O.y, B.x, B.y, "#333", 2.5);
+    drawVectorLabel(ctx, "", "a", O.x + ax/2 - 25, O.y + ay/2 + 5);
+    drawVectorLabel(ctx, "", "b", O.x + bx/2 + 10, O.y + by/2 + 5);
+
+    // 【修正：ベクトルka, kb の描画】
+    // 1. 不等号時にも表示。
+    // 2. ラベルの配置調整。
+    // 3. k=1 の時は表示しない。
+    if (stOp !== 'none' && stVal !== 0 && stVal !== 1) { // k !== 1 に限定
+      const k = stVal;
+      const kA_end = { x: O.x + ax * k, y: O.y + ay * k }; // kaの終点座標
+      const kB_end = { x: O.x + bx * k, y: O.y + by * k }; // kbの終点座標
+      
+      // 青い矢印を描画
+      drawArrow(ctx, O.x, O.y, kA_end.x, kA_end.y, "#0056b3", 2);
+      drawArrow(ctx, O.x, O.y, kB_end.x, kB_end.y, "#0056b3", 2);
+      
+      let pref = k === -1 ? "-" : (Math.round(k * 10) / 10).toString();
+
+      // 【修正：ラベルの配置調整】kA_endの左上へ、kB_endの右上へ
+      // drawVectorLabel(ctx, prefix, vecChar, x, y, color)
+      // Kaラベル: kA_endの左へ
+      drawVectorLabel(ctx, pref, "a", kA_end.x - 45, kA_end.y - 15, "#0056b3");
+      
+      // Kbラベル: kB_endの右へ
+      drawVectorLabel(ctx, pref, "b", kB_end.x + 15, kB_end.y - 15, "#0056b3");
+    }
+
+    // 頂点ドット
+    ctx.fillStyle = "black";
+    [O, A, B].forEach(p => {
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill();
+    });
+  }
+
+  draw();
+</script>
+</body>
+</html>
